@@ -32,6 +32,8 @@ final class CamundaTestCluster {
         container = new GenericContainer<>(IMAGE)
             .withEnv("SPRING_PROFILES_ACTIVE", "broker")
             .withEnv("CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI", "true")
+            // unprotecting the API covers REST only, the gRPC gateway still runs authorization checks
+            .withEnv("CAMUNDA_SECURITY_AUTHORIZATIONS_ENABLED", "false")
             .withEnv("CAMUNDA_DATA_SECONDARYSTORAGE_TYPE", "none")
             .withExposedPorts(REST_PORT, GRPC_PORT, MANAGEMENT_PORT)
             .waitingFor(Wait.forHttp("/actuator/health/readiness")

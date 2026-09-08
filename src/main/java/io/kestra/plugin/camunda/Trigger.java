@@ -254,14 +254,21 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
             this.publisherStarted.set(true);
 
             try {
-                var rJobType = runContext.render(this.jobType).as(String.class)
+                var rJobType = runContext.render(this.jobType).as(String.class).filter(v -> !v.isBlank())
                     .orElseThrow(() -> new IllegalArgumentException("`jobType` is required"));
                 var rTimeout = runContext.render(this.timeout).as(Duration.class).orElse(null);
                 var rFetchVariables = runContext.render(this.fetchVariables).asList(String.class);
-                var rWorkerName = runContext.render(this.workerName).as(String.class).orElse(this.id);
+                var rWorkerName = runContext.render(this.workerName).as(String.class).filter(v -> !v.isBlank()).orElse(this.id);
                 var rMaxJobsActive = runContext.render(this.maxJobsActive).as(Integer.class).orElse(null);
                 var rStreamEnabled = runContext.render(this.streamEnabled).as(Boolean.class).orElse(false);
                 var rTenantId = runContext.render(this.tenantId).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+                var rGrpcAddress = runContext.render(this.grpcAddress).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+
+                if (rStreamEnabled && rGrpcAddress == null) {
+                    // otherwise the client streams against the default gRPC address, 0.0.0.0:26500, and
+                    // retries forever while long polling keeps the trigger looking healthy
+                    throw new IllegalArgumentException("`streamEnabled` requires `grpcAddress`, job streaming has no REST equivalent");
+                }
 
                 try (CamundaClient client = this.camundaClient(runContext)) {
                     var builder = client.newWorker()

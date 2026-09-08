@@ -83,6 +83,9 @@ public interface CamundaConnectionInterface {
         if (rClusterId != null && (rRestAddress != null || rGrpcAddress != null)) {
             throw new IllegalArgumentException("`restAddress`/`grpcAddress` cannot be combined with `clusterId`, SaaS addresses are derived from the cluster ID and region");
         }
+        if (rClusterId != null && (rAuthorizationServerUrl != null || rAudience != null)) {
+            throw new IllegalArgumentException("`authorizationServerUrl`/`audience` cannot be combined with `clusterId`, Camunda SaaS derives the OAuth endpoint and audience from the cluster ID and region");
+        }
         if (oauth && rClusterId == null && rAuthorizationServerUrl == null) {
             throw new IllegalArgumentException("`authorizationServerUrl` is required for OAuth2 against a self-managed cluster, or set `clusterId` for Camunda SaaS");
         }
@@ -104,6 +107,16 @@ public interface CamundaConnectionInterface {
             }
             if (rGrpcAddress != null) {
                 builder.grpcAddress(URI.create(rGrpcAddress));
+            }
+
+            // preferRestOverGrpc defaults to true and each command reads it to pick its transport, so
+            // without this a client given only grpcAddress still sends commands to the default REST
+            // address, http://0.0.0.0:8080. Configuring one address picks that transport, configuring
+            // both leaves the SDK default in place.
+            if (rRestAddress != null && rGrpcAddress == null) {
+                builder.preferRestOverGrpc(true);
+            } else if (rGrpcAddress != null && rRestAddress == null) {
+                builder.preferRestOverGrpc(false);
             }
             if (basic) {
                 builder.credentialsProvider(CredentialsProvider.newBasicAuthCredentialsProviderBuilder()

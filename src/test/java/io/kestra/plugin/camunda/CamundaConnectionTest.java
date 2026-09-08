@@ -86,6 +86,32 @@ class CamundaConnectionTest {
         assertThat(exception.getMessage(), containsString("cannot be combined with `clusterId`"));
     }
 
+    @Test
+    void saas_cannotBeCombinedWithSelfManagedOauthProperties() {
+        var task = builder()
+            .clusterId(Property.ofValue("cluster-id"))
+            .clientId(Property.ofValue("client"))
+            .clientSecret(Property.ofValue("secret"))
+            .audience(Property.ofValue("zeebe-api"))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
+        assertThat(exception.getMessage(), containsString("cannot be combined with `clusterId`"));
+    }
+
+    @Test
+    void blankCredential_countsAsUnsetRatherThanHalfConfigured() throws Exception {
+        // `password: "{{ inputs.maybeEmpty }}"` rendering to "" must not switch Basic auth on, which
+        // would otherwise fail the "both must be set" guard or send an empty credential
+        var task = builder()
+            .restAddress(Property.ofValue("http://localhost:8080"))
+            .password(Property.ofValue("   "))
+            .build();
+
+        // no auth mode is configured, so building the client succeeds and only the command would fail
+        task.camundaClient(runContextFactory.of()).close();
+    }
+
     private static CompleteJob.CompleteJobBuilder<?, ?> builder() {
         return CompleteJob.builder()
             .id("auth-test")

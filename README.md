@@ -62,7 +62,8 @@ identity provider, and Camunda SaaS client credentials.
 ## Local development
 
 `docker-compose.yml` starts a single-node Camunda 8 cluster without secondary storage on
-`http://localhost:8081` (REST) and `localhost:26500` (gRPC), which is enough for every task here.
+`http://localhost:8080` (REST) and `localhost:26500` (gRPC), which is enough for every task here.
+Kestra's own dev server in that file is on `http://localhost:8090` so that Camunda keeps port 8080.
 
 Tests use Testcontainers with the same image, so `./gradlew test` needs Docker.
 

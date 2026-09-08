@@ -1,13 +1,15 @@
 version: "3.8"
 
 services:
+  # Kestra sits on 8090 so that Camunda keeps its own default port, 8080, which is what every
+  # example in this plugin uses.
   app:
     build:
       context: .
       dockerfile: Dockerfile
     command: server local
     ports:
-      - "8080:8080"
+      - "8090:8080"
     volumes:
       - ./build/libs/:/app/plugins/
 
@@ -20,6 +22,6 @@ services:
       CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI: "true"
       CAMUNDA_DATA_SECONDARYSTORAGE_TYPE: none
     ports:
-      - "8081:8080"
+      - "8080:8080"
       - "26500:26500"
       - "9600:9600"

@@ -118,3 +118,7 @@ window.
 
 `docker-compose.yml` in this repository starts a single-node Camunda 8 cluster without secondary
 storage, which is enough for every task here. Operate and Tasklist are not part of it.
+
+Camunda is published on its own default ports, `http://localhost:8080` for REST and
+`localhost:26500` for gRPC, so the examples above work as written. Kestra's own dev server in that
+same file is on `http://localhost:8090` to keep 8080 free.

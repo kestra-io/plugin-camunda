@@ -41,6 +41,18 @@ class CreateProcessInstanceValidationTest {
     }
 
     @Test
+    void blankProcessId_isRejectedAsUnsetRatherThanSentToCamunda() {
+        var task = CreateProcessInstance.builder()
+            .id("create-test")
+            .type(CreateProcessInstance.class.getName())
+            .processId(Property.ofValue("  "))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
+        assertThat(exception.getMessage(), containsString("Either `processId` or `processDefinitionKey`"));
+    }
+
+    @Test
     void processVersionWithoutProcessId_isRejected() {
         var task = CreateProcessInstance.builder()
             .id("create-test")

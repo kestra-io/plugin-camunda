@@ -119,11 +119,11 @@ public class PublishMessage extends AbstractCamundaTask implements RunnableTask<
     public Output run(RunContext runContext) throws Exception {
         var logger = runContext.logger();
 
-        var rMessageName = runContext.render(this.messageName).as(String.class)
+        var rMessageName = runContext.render(this.messageName).as(String.class).filter(v -> !v.isBlank())
             .orElseThrow(() -> new IllegalArgumentException("`messageName` is required"));
-        var rCorrelationKey = runContext.render(this.correlationKey).as(String.class).orElse(null);
+        var rCorrelationKey = runContext.render(this.correlationKey).as(String.class).filter(v -> !v.isBlank()).orElse(null);
         var rVariables = runContext.render(this.variables).asMap(String.class, Object.class);
-        var rMessageId = runContext.render(this.messageId).as(String.class).orElse(null);
+        var rMessageId = runContext.render(this.messageId).as(String.class).filter(v -> !v.isBlank()).orElse(null);
         var rTimeToLive = runContext.render(this.timeToLive).as(Duration.class).orElse(null);
 
         try {

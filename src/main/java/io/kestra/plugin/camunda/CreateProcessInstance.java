@@ -143,7 +143,7 @@ public class CreateProcessInstance extends AbstractCamundaTask implements Runnab
     public Output run(RunContext runContext) throws Exception {
         var logger = runContext.logger();
 
-        var rProcessId = runContext.render(this.processId).as(String.class).orElse(null);
+        var rProcessId = runContext.render(this.processId).as(String.class).filter(v -> !v.isBlank()).orElse(null);
         var rProcessDefinitionKey = runContext.render(this.processDefinitionKey).as(Long.class).orElse(null);
         var rVersion = runContext.render(this.processVersion).as(Integer.class).orElse(null);
         var rVariables = runContext.render(this.variables).asMap(String.class, Object.class);

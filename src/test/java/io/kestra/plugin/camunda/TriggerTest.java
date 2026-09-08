@@ -15,9 +15,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
@@ -117,6 +119,30 @@ class TriggerTest {
             var job = jobs.poll();
             assertThat(job, notNullValue());
             assertThat(job.getTenantId(), is("<default>"));
+        } finally {
+            trigger.kill();
+            subscription.dispose();
+        }
+    }
+
+    @Test
+    void streamEnabledWithoutGrpcAddress_failsLoudly() {
+        var trigger = Trigger.builder()
+            .id("stream-without-grpc")
+            .type(Trigger.class.getName())
+            .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
+            .jobType(Property.ofValue("kestra-notify"))
+            .streamEnabled(Property.ofValue(true))
+            .build();
+
+        var error = new AtomicReference<Throwable>();
+        var subscription = Flux.from(trigger.publisher(runContextFactory.of()))
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(job -> { }, error::set);
+
+        try {
+            await().atMost(Duration.ofSeconds(10)).until(() -> error.get() != null);
+            assertThat(error.get().getMessage(), containsString("`streamEnabled` requires `grpcAddress`"));
         } finally {
             trigger.kill();
             subscription.dispose();

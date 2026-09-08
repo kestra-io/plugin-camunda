@@ -110,6 +110,22 @@ class CamundaTaskTest {
     }
 
     @Test
+    void grpcAddressAlone_sendsCommandsOverGrpc() throws Exception {
+        // preferRestOverGrpc defaults to true, so without the transport switch this would go to the
+        // default REST address (http://0.0.0.0:8080) and fail with a connection error
+        var output = Deploy.builder()
+            .id("deploy")
+            .type(Deploy.class.getName())
+            .grpcAddress(Property.ofValue(CamundaTestCluster.grpcAddress()))
+            .resources(Property.ofValue(Map.of("instant-quote.bpmn", resource("instant-quote.bpmn"))))
+            .build()
+            .run(runContextFactory.of());
+
+        assertThat(output.getDeploymentKey(), greaterThan(0L));
+        assertThat(output.getProcesses(), hasSize(1));
+    }
+
+    @Test
     void deploy_readsResourceFromInternalStorage() throws Exception {
         var runContext = runContextFactory.of();
         var uri = runContext.storage().putFile(

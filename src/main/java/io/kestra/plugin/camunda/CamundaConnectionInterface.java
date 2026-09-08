@@ -159,6 +159,12 @@ public interface CamundaConnectionInterface {
         // them there. It also lets a self-managed cluster with both addresses set pick one.
         if (rTransport != null) {
             builder.preferRestOverGrpc(rTransport == Transport.REST);
+        } else if (rClusterId != null) {
+            // The SDK prefers REST, but a current free-tier SaaS cluster answers 404 on the REST base
+            // it derives, https://<region>.zeebe.camunda.io:443/<clusterId>, while gRPC on the same
+            // credentials works. gRPC is served by every supported cluster, so it is the safer default
+            // here. Set `transport: REST` to opt back in.
+            builder.preferRestOverGrpc(false);
         }
 
         if (rTenantId != null) {

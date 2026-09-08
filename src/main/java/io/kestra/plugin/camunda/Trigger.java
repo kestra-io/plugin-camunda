@@ -225,8 +225,8 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
     @Schema(
         title = "Which API to send commands and job activation over",
         description = """
-            Defaults to the API implied by the address that is set. Camunda SaaS derives both addresses,
-            so this is the only way to choose there. `streamEnabled` always uses gRPC regardless."""
+            Defaults to gRPC for Camunda SaaS, and for a self-managed cluster to the API implied by
+            whichever address is set. `streamEnabled` always uses gRPC regardless."""
     )
     @PluginProperty(group = "connection")
     private Property<Transport> transport;

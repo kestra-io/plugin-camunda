@@ -116,10 +116,10 @@ public abstract class AbstractCamundaTask extends Task implements CamundaConnect
     @Schema(
         title = "Which API to send commands over",
         description = """
-            Defaults to the API implied by the address that is set, and to REST when both or neither are.
-            Camunda SaaS derives both addresses, so this is the only way to choose there: set `GRPC` if a
-            REST command comes back `404 Not Found`, which means the cluster does not serve that REST
-            endpoint."""
+            Defaults to gRPC for Camunda SaaS, and for a self-managed cluster to the API implied by
+            whichever address is set, falling back to REST when both or neither are.
+            SaaS defaults to gRPC because a current cluster answers `404 Not Found` on the REST base the
+            client derives, while gRPC works on the same credentials. Set `REST` to opt back in."""
     )
     @PluginProperty(group = "connection")
     private Property<Transport> transport;

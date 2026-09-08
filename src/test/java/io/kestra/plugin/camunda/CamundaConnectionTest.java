@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -74,16 +76,23 @@ class CamundaConnectionTest {
     }
 
     @Test
-    void saas_cannotBeCombinedWithExplicitAddresses() {
+    void saas_explicitAddressOverridesTheDerivedOne() throws Exception {
+        // The cloud builder's build() calls determineRestAddress() and overwrites whatever was set, so
+        // an override only survives by not using it. Camunda derives
+        // https://<region>.zeebe.camunda.io:443/<clusterId>, which 404s on a cluster serving REST at
+        // /v2 on the gRPC host, and this is the only way to point at the right one.
+        var override = "https://cluster-id.sin-2.zeebe.camunda.io";
         var task = builder()
             .clusterId(Property.ofValue("cluster-id"))
+            .region(Property.ofValue("sin-2"))
             .clientId(Property.ofValue("client"))
             .clientSecret(Property.ofValue("secret"))
-            .restAddress(Property.ofValue("http://localhost:8080"))
+            .restAddress(Property.ofValue(override))
             .build();
 
-        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
-        assertThat(exception.getMessage(), containsString("cannot be combined with `clusterId`"));
+        try (var client = task.camundaClient(runContextFactory.of())) {
+            assertThat(client.getConfiguration().getRestAddress().toString(), is(override));
+        }
     }
 
     @Test
@@ -99,6 +108,42 @@ class CamundaConnectionTest {
 
         var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
         assertThat(exception.getMessage(), containsString("`audience` is required"));
+    }
+
+    @Test
+    void transportRest_withoutRestAddress_isRejected() {
+        // would otherwise send REST to the client default, http://0.0.0.0:8080
+        var task = builder()
+            .grpcAddress(Property.ofValue("http://localhost:26500"))
+            .transport(Property.ofValue(Transport.REST))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
+        assertThat(exception.getMessage(), containsString("`transport: REST` requires `restAddress`"));
+    }
+
+    @Test
+    void transportGrpc_withoutGrpcAddress_isRejected() {
+        var task = builder()
+            .restAddress(Property.ofValue("http://localhost:8080"))
+            .transport(Property.ofValue(Transport.GRPC))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
+        assertThat(exception.getMessage(), containsString("`transport: GRPC` requires `grpcAddress`"));
+    }
+
+    @Test
+    void transportOnSaas_needsNoAddressBecauseBothAreDerived() {
+        // clusterId with no addresses derives both, so either transport is reachable
+        var task = builder()
+            .clusterId(Property.ofValue("cluster-id"))
+            .clientId(Property.ofValue("client"))
+            .clientSecret(Property.ofValue("secret"))
+            .transport(Property.ofValue(Transport.GRPC))
+            .build();
+
+        assertDoesNotThrow(() -> task.camundaClient(runContextFactory.of()).close());
     }
 
     @Test

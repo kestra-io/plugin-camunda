@@ -26,6 +26,10 @@ import java.net.URI;
  */
 public interface CamundaConnectionInterface {
 
+    /** Camunda SaaS OAuth endpoint and audience, as the cloud builder derives them. */
+    String SAAS_TOKEN_URL = "https://login.cloud.camunda.io/oauth/token";
+    String SAAS_AUDIENCE = "zeebe.camunda.io";
+
     Property<String> getRestAddress();
 
     Property<String> getGrpcAddress();
@@ -83,9 +87,6 @@ public interface CamundaConnectionInterface {
         if (rClusterId != null && !oauth) {
             throw new IllegalArgumentException("`clientId` and `clientSecret` are required alongside `clusterId` for Camunda SaaS");
         }
-        if (rClusterId != null && (rRestAddress != null || rGrpcAddress != null)) {
-            throw new IllegalArgumentException("`restAddress`/`grpcAddress` cannot be combined with `clusterId`, SaaS addresses are derived from the cluster ID and region");
-        }
         if (rClusterId != null && (rAuthorizationServerUrl != null || rAudience != null)) {
             throw new IllegalArgumentException("`authorizationServerUrl`/`audience` cannot be combined with `clusterId`, Camunda SaaS derives the OAuth endpoint and audience from the cluster ID and region");
         }
@@ -102,10 +103,50 @@ public interface CamundaConnectionInterface {
             // http://0.0.0.0:26500, and surface a connection error instead of a configuration one
             throw new IllegalArgumentException("One of `restAddress`, `grpcAddress` or `clusterId` is required");
         }
+        // SaaS with no explicit address derives both, so any transport is reachable there. Anywhere
+        // else, asking for a transport whose address is missing would send the command to the client
+        // default for that transport and fail as a connection error rather than a configuration one.
+        var addressesDerived = rClusterId != null && rRestAddress == null && rGrpcAddress == null;
+        if (rTransport == Transport.REST && !addressesDerived && rRestAddress == null) {
+            throw new IllegalArgumentException("`transport: REST` requires `restAddress`, only `grpcAddress` is set");
+        }
+        if (rTransport == Transport.GRPC && !addressesDerived && rGrpcAddress == null) {
+            throw new IllegalArgumentException("`transport: GRPC` requires `grpcAddress`, only `restAddress` is set");
+        }
 
         CamundaClientBuilder builder;
 
-        if (rClusterId != null) {
+        if (rClusterId != null && (rRestAddress != null || rGrpcAddress != null)) {
+            // The cloud builder's build() calls determineRestAddress()/determineGrpcAddress() and
+            // overwrites anything set beforehand, so an override cannot survive it. Its REST derivation
+            // is https://<region>.zeebe.camunda.io:443/<clusterId>, the pre-8.8 gateway routing, which
+            // 404s on a cluster that serves REST at /v2 on the gRPC host instead. Build the client
+            // directly so an explicit address wins, keeping the SaaS OAuth endpoint and audience.
+            builder = CamundaClient.newClientBuilder()
+                .credentialsProvider(CredentialsProvider.newCredentialsProviderBuilder()
+                    .applyEnvironmentOverrides(false)
+                    .clientId(rClientId)
+                    .clientSecret(rClientSecret)
+                    .authorizationServerUrl(SAAS_TOKEN_URL)
+                    .audience(SAAS_AUDIENCE)
+                    .build()
+                );
+
+            if (rRestAddress != null) {
+                builder.restAddress(URI.create(rRestAddress));
+            }
+            if (rGrpcAddress != null) {
+                builder.grpcAddress(URI.create(rGrpcAddress));
+            }
+            if (rTransport == null) {
+                // same address-implied choice as self-managed
+                if (rRestAddress != null && rGrpcAddress == null) {
+                    builder.preferRestOverGrpc(true);
+                } else if (rGrpcAddress != null && rRestAddress == null) {
+                    builder.preferRestOverGrpc(false);
+                }
+            }
+        } else if (rClusterId != null) {
             var cloud = CamundaClient.newCloudClientBuilder()
                 .withClusterId(rClusterId)
                 .withClientId(rClientId)
@@ -159,6 +200,13 @@ public interface CamundaConnectionInterface {
         // them there. It also lets a self-managed cluster with both addresses set pick one.
         if (rTransport != null) {
             builder.preferRestOverGrpc(rTransport == Transport.REST);
+        } else if (rClusterId != null) {
+            // The SDK prefers REST, but a default free-tier SaaS cluster answers 404 on the REST base it
+            // derives, https://<region>.zeebe.camunda.io:443/<clusterId>, while gRPC succeeds with the
+            // same credentials in the same execution. Verified twice on a healthy cluster, once per
+            // transport, so it is not a start-up race. gRPC is served by every supported cluster, so
+            // SaaS defaults to it and works out of the box. Set `transport: REST` to opt back in.
+            builder.preferRestOverGrpc(false);
         }
 
         if (rTenantId != null) {

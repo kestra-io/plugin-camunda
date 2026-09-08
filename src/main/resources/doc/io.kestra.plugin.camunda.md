@@ -42,10 +42,24 @@ the client derives, `https://<region>.zeebe.camunda.io:443/<clusterId>`, while g
 same credentials in the same execution. gRPC is served by every supported cluster, so defaulting to
 it works everywhere REST does and also where REST does not.
 
-`transport: REST` opts back in on a cluster that serves it. Known limitation: on a cluster whose REST
-API lives at `/v2` on the gRPC host rather than the derived base, REST is not usable yet. Overriding
-`restAddress` alongside `clusterId` points the client at the right host, but the deployment request
-then fails on its `multipart/form-data` body. Use gRPC on such a cluster.
+To use REST on SaaS, take the **Orchestration Cluster REST Address** from the Camunda Console
+(cluster, then Connection information) and set it as `restAddress` alongside `clusterId`. This is what
+Camunda's own client documentation instructs, because the address the cloud builder derives is the
+pre-8.8 Zeebe gateway routing and does not match a unified Orchestration Cluster. The derivation is
+identical in 8.9 and 8.10, so it is not something a client upgrade fixes.
+
+```yaml
+clusterId: "{{ secret('CAMUNDA_CLUSTER_ID') }}"
+region: "{{ secret('CAMUNDA_REGION') }}"
+clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
+clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
+restAddress: "{{ secret('CAMUNDA_REST_ADDRESS') }}"
+transport: REST
+```
+
+Setting an address alongside `clusterId` builds the client directly rather than through the cloud
+builder, whose `build()` overwrites any address it is given, and keeps the SaaS OAuth endpoint and
+audience.
 
 ## Deploying resources
 

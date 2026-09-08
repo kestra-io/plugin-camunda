@@ -104,8 +104,11 @@ public abstract class AbstractCamundaTask extends Task implements CamundaConnect
     private Property<String> region;
 
     @Schema(
-        title = "Tenant ID",
-        description = "Applied to every command sent by this task. Only relevant on a cluster with multi-tenancy enabled."
+        title = "Camunda tenant ID",
+        description = """
+            Camunda's own multi-tenancy identifier, unrelated to the Kestra tenant the flow runs in.
+            Applied to every command this task sends. Defaults to `<default>`, which is the only tenant
+            on a cluster that does not have multi-tenancy enabled."""
     )
     @PluginProperty(group = "connection")
     private Property<String> tenantId;

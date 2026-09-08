@@ -12,6 +12,7 @@ import reactor.core.scheduler.Schedulers;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -36,13 +37,13 @@ class TriggerTest {
 
     @Test
     void activatesJob_thenReleasesTheStreamOnStop() throws Exception {
-        deployProcess();
+        var process = deployUniqueProcess();
 
         var trigger = Trigger.builder()
             .id("on-camunda-job")
             .type(Trigger.class.getName())
             .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
-            .jobType(Property.ofValue("kestra-notify"))
+            .jobType(Property.ofValue(process.jobType()))
             .timeout(Property.ofValue(Duration.ofMinutes(2)))
             .fetchVariables(Property.ofValue(List.of("orderId")))
             .build();
@@ -56,16 +57,16 @@ class TriggerTest {
             .subscribe(jobs::add);
 
         try {
-            var created = createProcessInstance();
+            var created = createProcessInstance(process);
 
             await().atMost(Duration.ofSeconds(30)).until(() -> !jobs.isEmpty());
 
             var job = jobs.poll();
             assertThat(job, notNullValue());
             assertThat(job.getJobKey(), greaterThan(0L));
-            assertThat(job.getType(), is("kestra-notify"));
+            assertThat(job.getType(), is(process.jobType()));
             assertThat(job.getElementId(), is("notify"));
-            assertThat(job.getBpmnProcessId(), is("kestra-order-fulfillment"));
+            assertThat(job.getBpmnProcessId(), is(process.processId()));
             assertThat(job.getProcessInstanceKey(), is(created.getProcessInstanceKey()));
             assertThat(job.getVariables(), hasEntry("orderId", "ORD-123"));
             assertThat(job.getDeadline(), notNullValue());
@@ -83,6 +84,39 @@ class TriggerTest {
             trigger.stop();
 
             await().atMost(Duration.ofSeconds(30)).untilTrue(completed);
+        } finally {
+            trigger.kill();
+            subscription.dispose();
+        }
+    }
+
+    @Test
+    void activatesJob_forAnExplicitTenant() throws Exception {
+        var process = deployUniqueProcess();
+
+        // <default> is the only tenant on a cluster without multi-tenancy, so this asserts the tenant
+        // reaches the worker builder at all: the client's defaultTenantId does not configure a worker
+        var trigger = Trigger.builder()
+            .id("on-camunda-job-tenanted")
+            .type(Trigger.class.getName())
+            .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
+            .jobType(Property.ofValue(process.jobType()))
+            .tenantId(Property.ofValue("<default>"))
+            .build();
+
+        var jobs = new ConcurrentLinkedQueue<Job>();
+        var subscription = Flux.from(trigger.publisher(runContextFactory.of()))
+            .subscribeOn(Schedulers.boundedElastic())
+            .subscribe(jobs::add);
+
+        try {
+            createProcessInstance(process);
+
+            await().atMost(Duration.ofSeconds(30)).until(() -> !jobs.isEmpty());
+
+            var job = jobs.poll();
+            assertThat(job, notNullValue());
+            assertThat(job.getTenantId(), is("<default>"));
         } finally {
             trigger.kill();
             subscription.dispose();
@@ -117,24 +151,40 @@ class TriggerTest {
             .kill();
     }
 
-    private void deployProcess() throws Exception {
+    /**
+     * Every worker in these tests watches its own job type. Sharing one would let whichever worker is
+     * open activate another test's job, which fails the test that was waiting for it.
+     */
+    private TestProcess deployUniqueProcess() throws Exception {
+        var suffix = UUID.randomUUID().toString().substring(0, 8);
+        var process = new TestProcess("kestra-order-fulfillment-" + suffix, "kestra-notify-" + suffix);
+
+        var bpmn = CamundaTaskTest.resource("order-fulfillment.bpmn")
+            .replace("kestra-order-fulfillment", process.processId())
+            .replace("kestra-notify", process.jobType());
+
         Deploy.builder()
             .id("deploy")
             .type(Deploy.class.getName())
             .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
-            .resources(Property.ofValue(Map.of("order-fulfillment.bpmn", CamundaTaskTest.resource("order-fulfillment.bpmn"))))
+            .resources(Property.ofValue(Map.of(process.processId() + ".bpmn", bpmn)))
             .build()
             .run(runContextFactory.of());
+
+        return process;
     }
 
-    private CreateProcessInstance.Output createProcessInstance() throws Exception {
+    private CreateProcessInstance.Output createProcessInstance(TestProcess process) throws Exception {
         return CreateProcessInstance.builder()
             .id("create")
             .type(CreateProcessInstance.class.getName())
             .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
-            .processId(Property.ofValue("kestra-order-fulfillment"))
+            .processId(Property.ofValue(process.processId()))
             .variables(Property.ofValue(Map.of("orderId", "ORD-123")))
             .build()
             .run(runContextFactory.of());
+    }
+
+    private record TestProcess(String processId, String jobType) {
     }
 }

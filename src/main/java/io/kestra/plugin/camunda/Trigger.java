@@ -194,7 +194,13 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
     @PluginProperty(group = "connection")
     private Property<String> region;
 
-    @Schema(title = "Tenant ID the worker activates jobs for")
+    @Schema(
+        title = "Camunda tenant ID the worker activates jobs for",
+        description = """
+            Camunda's own multi-tenancy identifier, unrelated to the Kestra tenant the flow runs in.
+            Defaults to `<default>`, so on a multi-tenant cluster a worker left unset will not see
+            jobs belonging to any other tenant."""
+    )
     @PluginProperty(group = "connection")
     private Property<String> tenantId;
 
@@ -255,6 +261,7 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
                 var rWorkerName = runContext.render(this.workerName).as(String.class).orElse(this.id);
                 var rMaxJobsActive = runContext.render(this.maxJobsActive).as(Integer.class).orElse(null);
                 var rStreamEnabled = runContext.render(this.streamEnabled).as(Boolean.class).orElse(false);
+                var rTenantId = runContext.render(this.tenantId).as(String.class).filter(v -> !v.isBlank()).orElse(null);
 
                 try (CamundaClient client = this.camundaClient(runContext)) {
                     var builder = client.newWorker()
@@ -271,6 +278,11 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
                     }
                     if (!rFetchVariables.isEmpty()) {
                         builder = builder.fetchVariables(rFetchVariables);
+                    }
+                    if (rTenantId != null) {
+                        // the client's defaultTenantId only applies to commands, a job worker activates
+                        // jobs for defaultJobWorkerTenantIds, which stays ["<default>"] unless set here
+                        builder = builder.tenantId(rTenantId);
                     }
 
                     try (JobWorker jobWorker = builder.open()) {

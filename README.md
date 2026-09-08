@@ -54,6 +54,7 @@ Tasks and triggers under `io.kestra.plugin.camunda`:
 - `CancelProcessInstance`: terminate a running process instance.
 - `PublishMessage`: publish a correlation message.
 - `CompleteJob`: report an activated job as done, with output variables.
+- `FailJob`: report an activated job as failed, raising a Camunda incident.
 - `Trigger`: hold a job worker open and start one execution per activated job.
 
 Authentication covers no credentials (development clusters), Basic auth, OAuth2 against a self-managed

@@ -45,6 +45,7 @@ import java.util.Map;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
+                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     jobType: send-notification
                     timeout: PT5M
 
@@ -59,6 +60,7 @@ import java.util.Map;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
+                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     jobKey: "{{ trigger.jobKey }}"
                     variables:
                       notified: true

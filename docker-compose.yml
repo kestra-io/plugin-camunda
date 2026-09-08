@@ -20,6 +20,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: broker
       CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI: "true"
+      # unprotecting the API covers REST only, the gRPC gateway runs authorization checks of its own
+      CAMUNDA_SECURITY_AUTHORIZATIONS_ENABLED: "false"
       CAMUNDA_DATA_SECONDARYSTORAGE_TYPE: none
     ports:
       - "8080:8080"

@@ -3,7 +3,7 @@
 ## What
 
 - Provides plugin components under `io.kestra.plugin.camunda`, talking to a Camunda 8 cluster through the official `io.camunda:camunda-client-java` client.
-- Tasks: `Deploy`, `CreateProcessInstance`, `CancelProcessInstance`, `PublishMessage`, `CompleteJob`.
+- Tasks: `Deploy`, `CreateProcessInstance`, `CancelProcessInstance`, `PublishMessage`, `CompleteJob`, `FailJob`.
 - Trigger: `Trigger`, a realtime job-worker trigger emitting one execution per activated Camunda job.
 
 ## Why
@@ -25,8 +25,8 @@ Single-module plugin, flat package `io.kestra.plugin.camunda`. No sub-plugins.
 
 Infrastructure dependencies (Docker Compose services):
 
-- `app`: local Kestra server with the built plugin mounted.
-- `camunda`: single-node Camunda 8 cluster, no secondary storage, REST on 8081 and gRPC on 26500.
+- `app`: local Kestra server with the built plugin mounted, on port 8090.
+- `camunda`: single-node Camunda 8 cluster, no secondary storage, REST on 8080 and gRPC on 26500. Authorizations are off, the gRPC gateway checks them separately from the REST unprotect flag.
 
 ### Dependency pinning
 

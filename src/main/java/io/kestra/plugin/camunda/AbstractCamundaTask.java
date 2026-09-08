@@ -33,14 +33,14 @@ public abstract class AbstractCamundaTask extends Task implements CamundaConnect
 
     @Schema(
         title = "REST API base URL of the Camunda cluster",
-        description = "For a self-managed cluster, the orchestration cluster address, for example `http://localhost:8080`. Most commands use the REST API by default."
+        description = "For a self-managed cluster, the orchestration cluster address, for example `http://localhost:8080`. Commands use the REST API unless only `grpcAddress` is set."
     )
     @PluginProperty(group = "connection")
     private Property<String> restAddress;
 
     @Schema(
         title = "gRPC gateway address of the Camunda cluster",
-        description = "For a self-managed cluster, for example `http://localhost:26500`. Used by the job worker stream of the [Trigger](https://kestra.io/plugins/plugin-camunda/triggers/io.kestra.plugin.camunda.trigger)."
+        description = "For a self-managed cluster, for example `http://localhost:26500`. Setting it without `restAddress` sends this task's commands over gRPC instead of REST."
     )
     @PluginProperty(group = "connection")
     private Property<String> grpcAddress;
@@ -84,7 +84,7 @@ public abstract class AbstractCamundaTask extends Task implements CamundaConnect
 
     @Schema(
         title = "OAuth2 audience",
-        description = "Audience claim requested with the access token. Defaults to whatever the identity provider issues."
+        description = "Required for OAuth2 against a self-managed cluster. The audience claim the identity provider must issue the token for, commonly `zeebe-api`. Derived from the cluster for Camunda SaaS, so leave it unset there."
     )
     @PluginProperty(group = "connection")
     private Property<String> audience;

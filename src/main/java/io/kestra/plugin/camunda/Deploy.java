@@ -53,6 +53,7 @@ import java.util.Set;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
+                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     resources:
                       order-fulfillment.bpmn: "{{ read('order-fulfillment.bpmn') }}"
                 """
@@ -105,7 +106,8 @@ public class Deploy extends AbstractCamundaTask implements RunnableTask<Deploy.O
         // resolved up front so that a bad resource name or a missing file fails without opening a connection
         var contents = new LinkedHashMap<String, String>();
         for (var resource : rResources.entrySet()) {
-            contents.put(validateResourceName(resource.getKey()), resolveContent(runContext, resource.getValue()));
+            var name = validateResourceName(resource.getKey());
+            contents.put(name, resolveContent(runContext, name, resource.getValue()));
         }
 
         try {
@@ -173,9 +175,9 @@ public class Deploy extends AbstractCamundaTask implements RunnableTask<Deploy.O
         return name;
     }
 
-    private static String resolveContent(RunContext runContext, String value) throws IOException {
+    private static String resolveContent(RunContext runContext, String name, String value) throws IOException {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Resource content cannot be empty");
+            throw new IllegalArgumentException("Resource '" + name + "': content cannot be empty");
         }
 
         if (!value.startsWith("kestra://")) {
@@ -184,6 +186,9 @@ public class Deploy extends AbstractCamundaTask implements RunnableTask<Deploy.O
 
         try (InputStream is = runContext.storage().getFile(URI.create(value))) {
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            // one bad key among several must say which one, the caller only sees the whole command fail
+            throw new IOException("Resource '" + name + "': cannot read " + value, e);
         }
     }
 

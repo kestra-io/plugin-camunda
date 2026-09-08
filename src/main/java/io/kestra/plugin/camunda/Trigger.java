@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 @SuperBuilder
 @ToString
@@ -44,8 +43,16 @@ import java.util.concurrent.atomic.AtomicReference;
     title = "Start a flow for each Camunda job of a given type",
     description = """
         Holds a Camunda job worker open and starts one execution per activated job, so a Kestra flow can implement a BPMN service task.
-        The job is not completed by the trigger: the flow decides the outcome and reports it with the [CompleteJob](https://kestra.io/plugins/plugin-camunda/tasks/io.kestra.plugin.camunda.completejob) task, using `{{ trigger.jobKey }}`.
-        A job the flow never completes stays locked until `timeout` elapses, after which Camunda hands it to a worker again, so keep `timeout` above the expected flow duration.
+        The job is not completed by the trigger: the flow reports the outcome with [CompleteJob](https://kestra.io/plugins/plugin-camunda/tasks/io.kestra.plugin.camunda.completejob) on success and [FailJob](https://kestra.io/plugins/plugin-camunda/tasks/io.kestra.plugin.camunda.failjob) on error, both keyed on `{{ trigger.jobKey }}`.
+
+        Always report an outcome. Camunda re-offers a job whose lock expired without decrementing its retries, so a flow
+        that reports neither is activated again every `timeout`, fails again, and repeats for as long as the process
+        instance lives. Retries never reach zero, so no incident is raised and nothing surfaces in Operate.
+
+        Delivery is at-least-once: a lock expiry, a worker restart mid-flow, or a flow slower than `timeout` all produce
+        a second execution for the same job. Keep `timeout` above the expected flow duration, and make the work
+        idempotent or guard it with the job key if a repeat would be harmful.
+
         Job activation uses the same transport as the tasks, which is the REST API when `restAddress` is set. Set `grpcAddress` together with `streamEnabled` for push-based streaming instead of long polling."""
 )
 @Plugin(
@@ -64,6 +71,7 @@ import java.util.concurrent.atomic.AtomicReference;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
+                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     jobType: send-notification
                     timeout: PT5M
 
@@ -78,6 +86,7 @@ import java.util.concurrent.atomic.AtomicReference;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
+                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     jobKey: "{{ trigger.jobKey }}"
                 """
         ),
@@ -102,6 +111,11 @@ import java.util.concurrent.atomic.AtomicReference;
                   - id: log_job
                     type: io.kestra.plugin.core.log.Log
                     message: "Charging {{ trigger.variables.amount }} for order {{ trigger.variables.orderId }}"
+
+                  - id: complete_job
+                    type: io.kestra.plugin.camunda.CompleteJob
+                    grpcAddress: http://localhost:26500
+                    jobKey: "{{ trigger.jobKey }}"
                 """
         )
     }
@@ -139,7 +153,11 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
 
     @Schema(
         title = "Maximum number of jobs activated at once",
-        description = "Bounds how many executions the trigger can start in parallel before Camunda is asked for more jobs. Defaults to the client default of 32."
+        description = """
+            Bounds how many jobs the worker activates before asking Camunda for more. Defaults to the client default of 32.
+            It does not cap how many executions run at once: the trigger releases each job as soon as its execution is
+            created, so the slot frees immediately. Use the flow's `concurrency` block to limit parallel executions, and
+            keep `timeout` above the resulting queue wait or the lock expires while an execution is still queued."""
     )
     @PluginProperty(group = "advanced")
     private Property<Integer> maxJobsActive;
@@ -233,12 +251,6 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
     @EqualsAndHashCode.Exclude
     private final CountDownLatch waitForTermination = new CountDownLatch(1);
 
-    @Builder.Default
-    @Getter(AccessLevel.NONE)
-    @ToString.Exclude
-    @EqualsAndHashCode.Exclude
-    private final AtomicReference<JobWorker> worker = new AtomicReference<>();
-
     @Override
     public Publisher<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) {
         RunContext runContext = conditionContext.getRunContext();
@@ -293,7 +305,6 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
                     }
 
                     try (JobWorker jobWorker = builder.open()) {
-                        this.worker.set(jobWorker);
                         logger.debug(
                             "Camunda job worker opened triggerId={} jobType={} workerName={} streamEnabled={}",
                             this.id, rJobType, rWorkerName, rStreamEnabled
@@ -309,10 +320,9 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
                 Thread.currentThread().interrupt();
                 sink.complete();
             } catch (Exception e) {
-                logger.error("Camunda trigger triggerId={} failed: {}", this.id, e.getMessage());
+                logger.error("Camunda trigger triggerId={} failed: {}", this.id, e.getMessage(), e);
                 sink.error(e);
             } finally {
-                this.worker.set(null);
                 this.waitForTermination.countDown();
             }
         }, FluxSink.OverflowStrategy.BUFFER);

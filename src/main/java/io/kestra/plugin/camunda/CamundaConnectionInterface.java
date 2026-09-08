@@ -89,6 +89,16 @@ public interface CamundaConnectionInterface {
         if (oauth && rClusterId == null && rAuthorizationServerUrl == null) {
             throw new IllegalArgumentException("`authorizationServerUrl` is required for OAuth2 against a self-managed cluster, or set `clusterId` for Camunda SaaS");
         }
+        if (oauth && rClusterId == null && rAudience == null) {
+            // the SDK's own validate() does requireNonNull on audience, and environment overrides are
+            // disabled here, so there is no fallback to CAMUNDA_TOKEN_AUDIENCE to pick it up
+            throw new IllegalArgumentException("`audience` is required for OAuth2 against a self-managed cluster, it is the audience claim the identity provider must issue the token for");
+        }
+        if (rClusterId == null && rRestAddress == null && rGrpcAddress == null) {
+            // the client would otherwise fall back to its defaults, http://0.0.0.0:8080 and
+            // http://0.0.0.0:26500, and surface a connection error instead of a configuration one
+            throw new IllegalArgumentException("One of `restAddress`, `grpcAddress` or `clusterId` is required");
+        }
 
         CamundaClientBuilder builder;
 

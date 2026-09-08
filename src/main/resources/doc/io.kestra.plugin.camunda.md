@@ -8,10 +8,14 @@ orchestration cluster and against Camunda SaaS.
 
 Every task and the trigger take the same connection properties.
 
-- `restAddress`: REST API base URL, for example `http://localhost:8080`. Most commands use it.
-- `grpcAddress`: gRPC gateway address, for example `http://localhost:26500`. Needed only for the
-  trigger's `streamEnabled` mode, job streaming has no REST equivalent.
-- `tenantId`: applied to every command, on a cluster with multi-tenancy enabled.
+- `restAddress`: REST API base URL, for example `http://localhost:8080`. Commands use it unless only
+  `grpcAddress` is set. One of `restAddress`, `grpcAddress` or `clusterId` is required.
+- `grpcAddress`: gRPC gateway address, for example `http://localhost:26500`. Setting it without
+  `restAddress` sends every command over gRPC. Required for the trigger's `streamEnabled` mode, which
+  has no REST equivalent.
+- `tenantId`: Camunda's own tenant, unrelated to the Kestra tenant the flow runs in. Always applied to
+  commands, defaulting to `<default>`. On the trigger it additionally selects which tenants' jobs the
+  worker activates, which is a separate SDK setting.
 
 Four authentication modes, picked from what is set:
 
@@ -19,8 +23,12 @@ Four authentication modes, picked from what is set:
 | --- | --- |
 | None | nothing, works only on a cluster with API protection disabled |
 | Basic | `username`, `password` |
-| OAuth2 self-managed | `clientId`, `clientSecret`, `authorizationServerUrl`, optional `audience` |
+| OAuth2 self-managed | `clientId`, `clientSecret`, `authorizationServerUrl`, `audience` |
 | Camunda SaaS | `clusterId`, `clientId`, `clientSecret`, optional `region` |
+
+`audience` is required for the self-managed OAuth2 mode, commonly `zeebe-api`. The client validates it
+and there is no fallback, because this plugin disables environment overrides (below). Camunda SaaS
+derives its own audience, so leave it unset there.
 
 Camunda's client normally reads `CAMUNDA_*` and `ZEEBE_*` environment variables. This plugin turns
 that off, so a flow always connects with what it declares and never with what the worker happens to
@@ -72,13 +80,22 @@ tasks:
 
 ## Implementing a service task as a flow
 
-`Trigger` holds a Camunda job worker open and starts one execution per activated job. The trigger
-does not complete the job: the flow decides the outcome and reports it with `CompleteJob`, using
-`{{ trigger.jobKey }}`.
+`Trigger` holds a Camunda job worker open and starts one execution per activated job. The trigger does
+not decide the outcome: the flow reports it with `CompleteJob` on success and `FailJob` on error, both
+keyed on `{{ trigger.jobKey }}`.
 
-A job the flow never completes stays locked until the trigger's `timeout` elapses, after which
-Camunda hands it to a worker again and the flow runs a second time. Keep `timeout` above the
-expected flow duration.
+Always report an outcome. Camunda re-offers a job whose lock expired without decrementing its retries,
+so a flow that reports neither is activated again every `timeout`, fails again, and repeats for as long
+as the process instance lives. Retries never reach zero, so no incident is raised and nothing surfaces
+in Operate. `FailJob` with the default `retries: 0` raises the incident immediately.
+
+Delivery is at-least-once. A lock expiry, a worker restart mid-flow, or a flow slower than `timeout`
+each produce a second execution for the same job. Keep `timeout` above the expected flow duration, and
+make the work idempotent or guard it on the job key if a repeat would be harmful.
+
+`maxJobsActive` bounds how many jobs the worker activates, not how many executions run at once: the
+trigger releases each job as soon as its execution is created. Use the flow's `concurrency` block to
+limit parallelism, and remember that time queued behind that limit counts against the job lock.
 
 ```yaml
 id: handle_camunda_job
@@ -102,6 +119,13 @@ tasks:
     jobKey: "{{ trigger.jobKey }}"
     variables:
       notified: true
+
+errors:
+  - id: fail_job
+    type: io.kestra.plugin.camunda.FailJob
+    restAddress: http://localhost:8080
+    jobKey: "{{ trigger.jobKey }}"
+    errorMessage: "Kestra execution {{ execution.id }} failed"
 ```
 
 Jobs are activated over the same transport as the tasks, which is the REST API when `restAddress` is

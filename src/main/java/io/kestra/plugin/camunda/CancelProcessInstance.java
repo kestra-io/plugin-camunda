@@ -40,6 +40,7 @@ import lombok.experimental.SuperBuilder;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
+                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     processId: order-fulfillment
 
                   - id: cancel_process
@@ -48,6 +49,7 @@ import lombok.experimental.SuperBuilder;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
+                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     processInstanceKey: "{{ outputs.start_process.processInstanceKey }}"
                 """
         )

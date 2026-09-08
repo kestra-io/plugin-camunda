@@ -87,6 +87,29 @@ class CamundaConnectionTest {
     }
 
     @Test
+    void selfManagedOauth_requiresAudience() {
+        // the SDK's own validate() does requireNonNull on audience, and environment overrides are
+        // disabled, so without this guard the user gets an NPE instead of a configuration error
+        var task = builder()
+            .restAddress(Property.ofValue("http://localhost:8080"))
+            .clientId(Property.ofValue("client"))
+            .clientSecret(Property.ofValue("secret"))
+            .authorizationServerUrl(Property.ofValue("http://localhost:18080/token"))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
+        assertThat(exception.getMessage(), containsString("`audience` is required"));
+    }
+
+    @Test
+    void noAddressAtAll_isRejectedRatherThanDefaultingToLoopback() {
+        var task = builder().build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
+        assertThat(exception.getMessage(), containsString("One of `restAddress`, `grpcAddress` or `clusterId`"));
+    }
+
+    @Test
     void saas_cannotBeCombinedWithSelfManagedOauthProperties() {
         var task = builder()
             .clusterId(Property.ofValue("cluster-id"))

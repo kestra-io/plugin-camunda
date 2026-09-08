@@ -52,95 +52,87 @@ public interface CamundaConnectionInterface {
      * Builds a client. The caller owns it and must close it.
      */
     default CamundaClient camundaClient(RunContext runContext) throws IllegalVariableEvaluationException {
-        var restAddress = render(runContext, getRestAddress());
-        var grpcAddress = render(runContext, getGrpcAddress());
-        var username = render(runContext, getUsername());
-        var password = render(runContext, getPassword());
-        var clientId = render(runContext, getClientId());
-        var clientSecret = render(runContext, getClientSecret());
-        var authorizationServerUrl = render(runContext, getAuthorizationServerUrl());
-        var audience = render(runContext, getAudience());
-        var clusterId = render(runContext, getClusterId());
-        var region = render(runContext, getRegion());
-        var tenantId = render(runContext, getTenantId());
+        // blank is treated as unset, so "is it configured" stays a single null check below
+        var rRestAddress = runContext.render(getRestAddress()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rGrpcAddress = runContext.render(getGrpcAddress()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rUsername = runContext.render(getUsername()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rPassword = runContext.render(getPassword()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rClientId = runContext.render(getClientId()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rClientSecret = runContext.render(getClientSecret()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rAuthorizationServerUrl = runContext.render(getAuthorizationServerUrl()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rAudience = runContext.render(getAudience()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rClusterId = runContext.render(getClusterId()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rRegion = runContext.render(getRegion()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rTenantId = runContext.render(getTenantId()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
 
-        var basic = username != null || password != null;
-        var oauth = clientId != null || clientSecret != null;
+        var basic = rUsername != null || rPassword != null;
+        var oauth = rClientId != null || rClientSecret != null;
 
         if (basic && oauth) {
             throw new IllegalArgumentException("`username`/`password` and `clientId`/`clientSecret` are mutually exclusive, pick one authentication mode");
         }
-        if (basic && (username == null || password == null)) {
+        if (basic && (rUsername == null || rPassword == null)) {
             throw new IllegalArgumentException("`username` and `password` must both be set for Basic authentication");
         }
-        if (oauth && (clientId == null || clientSecret == null)) {
+        if (oauth && (rClientId == null || rClientSecret == null)) {
             throw new IllegalArgumentException("`clientId` and `clientSecret` must both be set for OAuth2 authentication");
         }
-        if (clusterId != null && !oauth) {
+        if (rClusterId != null && !oauth) {
             throw new IllegalArgumentException("`clientId` and `clientSecret` are required alongside `clusterId` for Camunda SaaS");
         }
-        if (clusterId != null && (restAddress != null || grpcAddress != null)) {
+        if (rClusterId != null && (rRestAddress != null || rGrpcAddress != null)) {
             throw new IllegalArgumentException("`restAddress`/`grpcAddress` cannot be combined with `clusterId`, SaaS addresses are derived from the cluster ID and region");
         }
-        if (oauth && clusterId == null && authorizationServerUrl == null) {
+        if (oauth && rClusterId == null && rAuthorizationServerUrl == null) {
             throw new IllegalArgumentException("`authorizationServerUrl` is required for OAuth2 against a self-managed cluster, or set `clusterId` for Camunda SaaS");
         }
 
         CamundaClientBuilder builder;
 
-        if (clusterId != null) {
+        if (rClusterId != null) {
             var cloud = CamundaClient.newCloudClientBuilder()
-                .withClusterId(clusterId)
-                .withClientId(clientId)
-                .withClientSecret(clientSecret);
+                .withClusterId(rClusterId)
+                .withClientId(rClientId)
+                .withClientSecret(rClientSecret);
 
-            builder = region != null ? cloud.withRegion(region) : cloud;
+            builder = rRegion != null ? cloud.withRegion(rRegion) : cloud;
         } else {
             builder = CamundaClient.newClientBuilder();
 
-            if (restAddress != null) {
-                builder.restAddress(URI.create(restAddress));
+            if (rRestAddress != null) {
+                builder.restAddress(URI.create(rRestAddress));
             }
-            if (grpcAddress != null) {
-                builder.grpcAddress(URI.create(grpcAddress));
+            if (rGrpcAddress != null) {
+                builder.grpcAddress(URI.create(rGrpcAddress));
             }
             if (basic) {
                 builder.credentialsProvider(CredentialsProvider.newBasicAuthCredentialsProviderBuilder()
                     .applyEnvironmentOverrides(false)
-                    .username(username)
-                    .password(password)
+                    .username(rUsername)
+                    .password(rPassword)
                     .build()
                 );
             } else if (oauth) {
                 var oauthBuilder = CredentialsProvider.newCredentialsProviderBuilder()
                     .applyEnvironmentOverrides(false)
-                    .clientId(clientId)
-                    .clientSecret(clientSecret)
-                    .authorizationServerUrl(authorizationServerUrl);
+                    .clientId(rClientId)
+                    .clientSecret(rClientSecret)
+                    .authorizationServerUrl(rAuthorizationServerUrl);
 
-                if (audience != null) {
-                    oauthBuilder.audience(audience);
+                if (rAudience != null) {
+                    oauthBuilder.audience(rAudience);
                 }
 
                 builder.credentialsProvider(oauthBuilder.build());
             }
         }
 
-        if (tenantId != null) {
-            builder.defaultTenantId(tenantId);
+        if (rTenantId != null) {
+            builder.defaultTenantId(rTenantId);
         }
 
         // the SDK reads CAMUNDA_*/ZEEBE_* environment variables by default, which would let the
         // worker environment silently override what the flow declares
         return builder.applyEnvironmentVariableOverrides(false).build();
-    }
-
-    /** Blank is treated as unset, so "is it configured" stays a single null check above. */
-    private static String render(RunContext runContext, Property<String> property) throws IllegalVariableEvaluationException {
-        return runContext.render(property)
-            .as(String.class)
-            .map(String::trim)
-            .filter(value -> !value.isEmpty())
-            .orElse(null);
     }
 }

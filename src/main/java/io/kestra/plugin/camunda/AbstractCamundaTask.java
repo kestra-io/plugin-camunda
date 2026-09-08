@@ -1,21 +1,35 @@
 package io.kestra.plugin.camunda;
 
+import io.camunda.client.CamundaClient;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.WorkerJobLifecycle;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 @SuperBuilder
 @ToString
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-public abstract class AbstractCamundaTask extends Task implements CamundaConnectionInterface {
+public abstract class AbstractCamundaTask extends Task implements CamundaConnectionInterface, WorkerJobLifecycle {
+
+    @Builder.Default
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private final AtomicReference<CamundaClient> runningClient = new AtomicReference<>();
 
     @Schema(
         title = "REST API base URL of the Camunda cluster",
@@ -95,4 +109,37 @@ public abstract class AbstractCamundaTask extends Task implements CamundaConnect
     )
     @PluginProperty(group = "connection")
     private Property<String> tenantId;
+
+    /**
+     * Opens a client and keeps a reference to it so that {@link #kill()} can tear it down.
+     * Always pair with {@link #closeClient()} in a finally block.
+     */
+    protected CamundaClient openClient(RunContext runContext) throws IllegalVariableEvaluationException {
+        var client = this.camundaClient(runContext);
+        this.runningClient.set(client);
+
+        return client;
+    }
+
+    /**
+     * Closes the client at most once, whichever of the task thread or {@link #kill()} gets there first.
+     */
+    protected void closeClient() {
+        var client = this.runningClient.getAndSet(null);
+        if (client != null) {
+            client.close();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Camunda commands block in {@code CamundaFuture.join()}, which ignores thread interruption, so a
+     * killed execution would otherwise sit until `requestTimeout` elapses. Closing the client from here
+     * shuts the transports down and fails the in-flight command.
+     */
+    @Override
+    public void kill() {
+        this.closeClient();
+    }
 }

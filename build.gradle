@@ -109,9 +109,9 @@ dependencies {
     testImplementation "org.hamcrest:hamcrest-library"
     testImplementation "org.awaitility:awaitility"
 
-    // testcontainers
+    // testcontainers, core only: the cluster is a plain GenericContainer started once by CamundaTestCluster,
+    // so the junit-jupiter extension module (still on 1.x) is not needed
     testImplementation "org.testcontainers:testcontainers:2.0.5"
-    testImplementation "org.testcontainers:junit-jupiter:1.21.4"
 }
 
 /**********************************************************************************************************************\

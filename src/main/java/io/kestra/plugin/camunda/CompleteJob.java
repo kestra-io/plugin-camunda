@@ -90,8 +90,8 @@ public class CompleteJob extends AbstractCamundaTask implements RunnableTask<Voi
             .orElseThrow(() -> new IllegalArgumentException("`jobKey` is required"));
         var rVariables = runContext.render(this.variables).asMap(String.class, Object.class);
 
-        try (var client = this.camundaClient(runContext)) {
-            var command = client.newCompleteCommand(rJobKey);
+        try {
+            var command = this.openClient(runContext).newCompleteCommand(rJobKey);
 
             if (!rVariables.isEmpty()) {
                 command = command.variables(rVariables);
@@ -99,6 +99,8 @@ public class CompleteJob extends AbstractCamundaTask implements RunnableTask<Voi
 
             command.execute();
             logger.info("Completed job {}", rJobKey);
+        } finally {
+            this.closeClient();
         }
 
         return null;

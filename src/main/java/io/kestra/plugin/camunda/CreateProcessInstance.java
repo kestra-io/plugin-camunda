@@ -116,7 +116,10 @@ public class CreateProcessInstance extends AbstractCamundaTask implements Runnab
 
     @Schema(
         title = "Wait for the process instance to complete",
-        description = "When `true`, the task returns only once the process instance has ended, and its variables are available in the `variables` output."
+        description = """
+            When `true`, the task returns only once the process instance has ended, and its variables are available in the `variables` output.
+            Killing the execution while it waits stops the task but not the process instance, Camunda keeps running it. The process
+            instance key is only known once the command returns, so there is nothing to cancel it by while the wait is in flight."""
     )
     @Builder.Default
     @PluginProperty(group = "main")
@@ -158,7 +161,9 @@ public class CreateProcessInstance extends AbstractCamundaTask implements Runnab
             throw new IllegalArgumentException("`processVersion` can only be used with `processId`, `processDefinitionKey` already targets one version");
         }
 
-        try (var client = this.camundaClient(runContext)) {
+        try {
+            var client = this.openClient(runContext);
+
             CreateProcessInstanceCommandStep1.CreateProcessInstanceCommandStep3 command = rProcessId != null
                 ? withVersion(client.newCreateInstanceCommand().bpmnProcessId(rProcessId), rVersion)
                 : client.newCreateInstanceCommand().processDefinitionKey(rProcessDefinitionKey);
@@ -172,6 +177,8 @@ public class CreateProcessInstance extends AbstractCamundaTask implements Runnab
             return rAwaitCompletion
                 ? awaitResult(command, rFetchVariables, rRequestTimeout)
                 : start(command, rRequestTimeout);
+        } finally {
+            this.closeClient();
         }
     }
 

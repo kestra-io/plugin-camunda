@@ -108,8 +108,8 @@ public class Deploy extends AbstractCamundaTask implements RunnableTask<Deploy.O
             contents.put(validateResourceName(resource.getKey()), resolveContent(runContext, resource.getValue()));
         }
 
-        try (var client = this.camundaClient(runContext)) {
-            var command = client.newDeployResourceCommand();
+        try {
+            var command = this.openClient(runContext).newDeployResourceCommand();
             // the fluent builder only exposes the final step after the first resource, so keep the last returned step
             DeployResourceCommandStep1.DeployResourceCommandStep2 step = null;
 
@@ -158,6 +158,8 @@ public class Deploy extends AbstractCamundaTask implements RunnableTask<Deploy.O
                     .toList()
                 )
                 .build();
+        } finally {
+            this.closeClient();
         }
     }
 

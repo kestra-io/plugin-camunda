@@ -126,8 +126,8 @@ public class PublishMessage extends AbstractCamundaTask implements RunnableTask<
         var rMessageId = runContext.render(this.messageId).as(String.class).orElse(null);
         var rTimeToLive = runContext.render(this.timeToLive).as(Duration.class).orElse(null);
 
-        try (var client = this.camundaClient(runContext)) {
-            var step = client.newPublishMessageCommand().messageName(rMessageName);
+        try {
+            var step = this.openClient(runContext).newPublishMessageCommand().messageName(rMessageName);
 
             PublishMessageCommandStep1.PublishMessageCommandStep3 command = rCorrelationKey != null
                 ? step.correlationKey(rCorrelationKey)
@@ -150,6 +150,8 @@ public class PublishMessage extends AbstractCamundaTask implements RunnableTask<
                 .messageKey(response.getMessageKey())
                 .tenantId(response.getTenantId())
                 .build();
+        } finally {
+            this.closeClient();
         }
     }
 

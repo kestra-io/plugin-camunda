@@ -20,6 +20,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.notNullValue;
 
 @KestraTest
@@ -86,6 +87,34 @@ class TriggerTest {
             trigger.kill();
             subscription.dispose();
         }
+    }
+
+    @Test
+    void killBeforeTheWorkerOpens_returnsInsteadOfWaitingForTermination() {
+        var trigger = Trigger.builder()
+            .id("never-subscribed")
+            .type(Trigger.class.getName())
+            .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
+            .jobType(Property.ofValue("kestra-notify"))
+            .build();
+
+        // kill() waits for the publisher to release the worker, which never happens here because the
+        // publisher was never subscribed, so it must fall through instead of blocking on the latch
+        var start = System.nanoTime();
+        trigger.kill();
+        var elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(elapsed, lessThan(Duration.ofSeconds(5)));
+    }
+
+    @Test
+    void killWithoutAnOpenClient_isANoOp() {
+        CompleteJob.builder()
+            .id("never-run")
+            .type(CompleteJob.class.getName())
+            .jobKey(Property.ofValue(1L))
+            .build()
+            .kill();
     }
 
     private void deployProcess() throws Exception {

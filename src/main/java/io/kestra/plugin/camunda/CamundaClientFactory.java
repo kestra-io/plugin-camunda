@@ -151,6 +151,18 @@ final class CamundaClientFactory {
             }
         }
 
+        /**
+         * A record's generated toString() prints every component, and Lombok's @ToString.Exclude does not
+         * apply to records, so it is replaced here to keep credentials out of any future log line.
+         */
+        @Override
+        public String toString() {
+            return "Config[restAddress=" + restAddress + ", grpcAddress=" + grpcAddress
+                + ", clusterId=" + clusterId + ", region=" + region + ", tenantId=" + tenantId
+                + ", authorizationServerUrl=" + authorizationServerUrl + ", audience=" + audience
+                + ", credentials=" + (isSaas() || isOauth() ? "oauth" : isBasic() ? "basic" : "none") + "]";
+        }
+
         private static String render(RunContext runContext, Property<String> property) throws IllegalVariableEvaluationException {
             return runContext.render(property)
                 .as(String.class)

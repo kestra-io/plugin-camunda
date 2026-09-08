@@ -68,9 +68,11 @@ public class CancelProcessInstance extends AbstractCamundaTask implements Runnab
         var rProcessInstanceKey = runContext.render(this.processInstanceKey).as(Long.class)
             .orElseThrow(() -> new IllegalArgumentException("`processInstanceKey` is required"));
 
-        try (var client = this.camundaClient(runContext)) {
-            client.newCancelInstanceCommand(rProcessInstanceKey).execute();
+        try {
+            this.openClient(runContext).newCancelInstanceCommand(rProcessInstanceKey).execute();
             logger.info("Cancelled process instance {}", rProcessInstanceKey);
+        } finally {
+            this.closeClient();
         }
 
         return null;

@@ -31,6 +31,7 @@ import reactor.core.publisher.FluxSink;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -197,11 +198,21 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
     @PluginProperty(group = "connection")
     private Property<String> tenantId;
 
+    /** How long {@link #kill()} waits for the job worker and client to close before giving up. */
+    private static final Duration SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
+
     @Builder.Default
     @Getter(AccessLevel.NONE)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private final AtomicBoolean isActive = new AtomicBoolean(true);
+
+    /** Set when the publisher's callback begins, so {@link #stop} knows termination will be signalled. */
+    @Builder.Default
+    @Getter(AccessLevel.NONE)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private final AtomicBoolean publisherStarted = new AtomicBoolean(false);
 
     /** Released by {@link #stop()} to let the worker thread close the stream. */
     @Builder.Default
@@ -233,6 +244,8 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
     public Publisher<Job> publisher(RunContext runContext) {
         return Flux.create(sink -> {
             var logger = runContext.logger();
+            // set before anything can fail, so kill() knows the finally block below will run
+            this.publisherStarted.set(true);
 
             try {
                 var rJobType = runContext.render(this.jobType).as(String.class)
@@ -271,14 +284,16 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
                         this.stopSignal.await();
                     }
                 }
+
+                sink.complete();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                sink.complete();
             } catch (Exception e) {
                 logger.error("Camunda trigger triggerId={} failed: {}", this.id, e.getMessage());
                 sink.error(e);
             } finally {
                 this.worker.set(null);
-                sink.complete();
                 this.waitForTermination.countDown();
             }
         }, FluxSink.OverflowStrategy.BUFFER);
@@ -309,15 +324,23 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
         LoggerFactory.getLogger(Trigger.class)
             .debug("Stopping Camunda trigger triggerId={} (wait={})", this.id, wait);
 
-        var hasWorker = this.worker.get() != null;
         this.stopSignal.countDown();
 
-        if (wait && hasWorker) {
-            try {
-                this.waitForTermination.await();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+        // publisherStarted is read after the signal, so a publisher racing to start either sees the
+        // released latch and closes immediately, or is already past the flag and will count down
+        if (!wait || !this.publisherStarted.get()) {
+            return;
+        }
+
+        try {
+            // kill() runs on the worker's kill-dispatch thread, so this wait is bounded: an unresponsive
+            // gateway during shutdown must not stall kill signals for every other job on this worker
+            if (!this.waitForTermination.await(SHUTDOWN_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) {
+                LoggerFactory.getLogger(Trigger.class)
+                    .warn("Camunda job worker triggerId={} did not close within {}, abandoning it", this.id, SHUTDOWN_TIMEOUT);
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 }

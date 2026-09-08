@@ -113,6 +113,17 @@ public abstract class AbstractCamundaTask extends Task implements CamundaConnect
     @PluginProperty(group = "connection")
     private Property<String> tenantId;
 
+    @Schema(
+        title = "Which API to send commands over",
+        description = """
+            Defaults to the API implied by the address that is set, and to REST when both or neither are.
+            Camunda SaaS derives both addresses, so this is the only way to choose there: set `GRPC` if a
+            REST command comes back `404 Not Found`, which means the cluster does not serve that REST
+            endpoint."""
+    )
+    @PluginProperty(group = "connection")
+    private Property<Transport> transport;
+
     /**
      * Opens a client and keeps a reference to it so that {@link #kill()} can tear it down.
      * Always pair with {@link #closeClient()} in a finally block.

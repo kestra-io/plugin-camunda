@@ -48,6 +48,8 @@ public interface CamundaConnectionInterface {
 
     Property<String> getTenantId();
 
+    Property<Transport> getTransport();
+
     /**
      * Builds a client. The caller owns it and must close it.
      */
@@ -64,6 +66,7 @@ public interface CamundaConnectionInterface {
         var rClusterId = runContext.render(getClusterId()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
         var rRegion = runContext.render(getRegion()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
         var rTenantId = runContext.render(getTenantId()).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+        var rTransport = runContext.render(getTransport()).as(Transport.class).orElse(null);
 
         var basic = rUsername != null || rPassword != null;
         var oauth = rClientId != null || rClientSecret != null;
@@ -122,11 +125,13 @@ public interface CamundaConnectionInterface {
             // preferRestOverGrpc defaults to true and each command reads it to pick its transport, so
             // without this a client given only grpcAddress still sends commands to the default REST
             // address, http://0.0.0.0:8080. Configuring one address picks that transport, configuring
-            // both leaves the SDK default in place.
-            if (rRestAddress != null && rGrpcAddress == null) {
-                builder.preferRestOverGrpc(true);
-            } else if (rGrpcAddress != null && rRestAddress == null) {
-                builder.preferRestOverGrpc(false);
+            // both leaves the SDK default in place. An explicit `transport` overrides this below.
+            if (rTransport == null) {
+                if (rRestAddress != null && rGrpcAddress == null) {
+                    builder.preferRestOverGrpc(true);
+                } else if (rGrpcAddress != null && rRestAddress == null) {
+                    builder.preferRestOverGrpc(false);
+                }
             }
             if (basic) {
                 builder.credentialsProvider(CredentialsProvider.newBasicAuthCredentialsProviderBuilder()
@@ -148,6 +153,12 @@ public interface CamundaConnectionInterface {
 
                 builder.credentialsProvider(oauthBuilder.build());
             }
+        }
+
+        // SaaS derives both addresses, so an explicit `transport` is the only way to choose between
+        // them there. It also lets a self-managed cluster with both addresses set pick one.
+        if (rTransport != null) {
+            builder.preferRestOverGrpc(rTransport == Transport.REST);
         }
 
         if (rTenantId != null) {

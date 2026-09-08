@@ -13,6 +13,8 @@ Every task and the trigger take the same connection properties.
 - `grpcAddress`: gRPC gateway address, for example `http://localhost:26500`. Setting it without
   `restAddress` sends every command over gRPC. Required for the trigger's `streamEnabled` mode, which
   has no REST equivalent.
+- `transport`: `REST` or `GRPC`. Defaults to whichever address is set, and to REST when both or
+  neither are. Camunda SaaS derives both addresses, so this is the only way to choose there.
 - `tenantId`: Camunda's own tenant, unrelated to the Kestra tenant the flow runs in. Always applied to
   commands, defaulting to `<default>`. On the trigger it additionally selects which tenants' jobs the
   worker activates, which is a separate SDK setting.
@@ -33,6 +35,11 @@ derives its own audience, so leave it unset there.
 Camunda's client normally reads `CAMUNDA_*` and `ZEEBE_*` environment variables. This plugin turns
 that off, so a flow always connects with what it declares and never with what the worker happens to
 have in its environment.
+
+If a command against Camunda SaaS comes back `Failed with code 404: 'Not Found'`, the cluster is not
+serving that REST endpoint at the address the client derives. Set `transport: GRPC` to use the gRPC
+gateway instead, which every supported cluster version serves. Check too that the cluster is running
+rather than hibernated, and that `region` matches the console exactly.
 
 ## Deploying resources
 

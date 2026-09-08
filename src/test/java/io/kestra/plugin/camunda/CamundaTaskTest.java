@@ -126,6 +126,37 @@ class CamundaTaskTest {
     }
 
     @Test
+    void transportGrpc_overridesTheAddressImpliedDefault() throws Exception {
+        // both addresses set, so the address heuristic cannot decide: transport must
+        var output = Deploy.builder()
+            .id("deploy")
+            .type(Deploy.class.getName())
+            .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
+            .grpcAddress(Property.ofValue(CamundaTestCluster.grpcAddress()))
+            .transport(Property.ofValue(Transport.GRPC))
+            .resources(Property.ofValue(Map.of("instant-quote.bpmn", resource("instant-quote.bpmn"))))
+            .build()
+            .run(runContextFactory.of());
+
+        assertThat(output.getDeploymentKey(), greaterThan(0L));
+    }
+
+    @Test
+    void transportRest_overridesAGrpcOnlyAddress() throws Exception {
+        // grpcAddress alone would imply gRPC, the explicit transport sends it over REST instead
+        var output = Deploy.builder()
+            .id("deploy")
+            .type(Deploy.class.getName())
+            .restAddress(Property.ofValue(CamundaTestCluster.restAddress()))
+            .transport(Property.ofValue(Transport.REST))
+            .resources(Property.ofValue(Map.of("instant-quote.bpmn", resource("instant-quote.bpmn"))))
+            .build()
+            .run(runContextFactory.of());
+
+        assertThat(output.getDeploymentKey(), greaterThan(0L));
+    }
+
+    @Test
     void deploy_readsResourceFromInternalStorage() throws Exception {
         var runContext = runContextFactory.of();
         var uri = runContext.storage().putFile(

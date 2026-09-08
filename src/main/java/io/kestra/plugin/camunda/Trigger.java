@@ -222,6 +222,15 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
     @PluginProperty(group = "connection")
     private Property<String> tenantId;
 
+    @Schema(
+        title = "Which API to send commands and job activation over",
+        description = """
+            Defaults to the API implied by the address that is set. Camunda SaaS derives both addresses,
+            so this is the only way to choose there. `streamEnabled` always uses gRPC regardless."""
+    )
+    @PluginProperty(group = "connection")
+    private Property<Transport> transport;
+
     /** How long {@link #kill()} waits for the job worker and client to close before giving up. */
     private static final Duration SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
 
@@ -276,10 +285,12 @@ public class Trigger extends AbstractTrigger implements RealtimeTriggerInterface
                 var rTenantId = runContext.render(this.tenantId).as(String.class).filter(v -> !v.isBlank()).orElse(null);
                 var rGrpcAddress = runContext.render(this.grpcAddress).as(String.class).filter(v -> !v.isBlank()).orElse(null);
 
-                if (rStreamEnabled && rGrpcAddress == null) {
+                var rClusterIdForStream = runContext.render(this.clusterId).as(String.class).filter(v -> !v.isBlank()).orElse(null);
+                if (rStreamEnabled && rGrpcAddress == null && rClusterIdForStream == null) {
                     // otherwise the client streams against the default gRPC address, 0.0.0.0:26500, and
-                    // retries forever while long polling keeps the trigger looking healthy
-                    throw new IllegalArgumentException("`streamEnabled` requires `grpcAddress`, job streaming has no REST equivalent");
+                    // retries forever while long polling keeps the trigger looking healthy. SaaS is fine
+                    // without grpcAddress because the cloud builder derives one.
+                    throw new IllegalArgumentException("`streamEnabled` requires `grpcAddress`, or `clusterId` for Camunda SaaS, job streaming has no REST equivalent");
                 }
 
                 try (CamundaClient client = this.camundaClient(runContext)) {

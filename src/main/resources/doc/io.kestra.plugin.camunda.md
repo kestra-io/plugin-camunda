@@ -13,8 +13,8 @@ Every task and the trigger take the same connection properties.
 - `grpcAddress`: gRPC gateway address, for example `http://localhost:26500`. Setting it without
   `restAddress` sends every command over gRPC. Required for the trigger's `streamEnabled` mode, which
   has no REST equivalent.
-- `transport`: `REST` or `GRPC`. Defaults to gRPC for SaaS, and for a self-managed cluster to the API
-  implied by whichever address is set, falling back to REST when both or neither are.
+- `transport`: `REST` or `GRPC`. Defaults to the API implied by whichever address is set, and to REST
+  when both or neither are. Setting it is the only way to choose on SaaS, which derives both.
 - `tenantId`: Camunda's own tenant, unrelated to the Kestra tenant the flow runs in. Always applied to
   commands, defaulting to `<default>`. On the trigger it additionally selects which tenants' jobs the
   worker activates, which is a separate SDK setting.
@@ -36,10 +36,11 @@ Camunda's client normally reads `CAMUNDA_*` and `ZEEBE_*` environment variables.
 that off, so a flow always connects with what it declares and never with what the worker happens to
 have in its environment.
 
-Camunda SaaS uses gRPC by default. A current free-tier cluster answers `404 Not Found` on the REST
-base the client derives, `https://<region>.zeebe.camunda.io:443/<clusterId>`, while gRPC succeeds on
-the same credentials, so gRPC is the default that works out of the box. `transport: REST` opts back
-in, and a `404` after doing so means that cluster does not serve REST v2 at that address.
+A command against a freshly created SaaS cluster can come back `Failed with code 404: 'Not Found'`
+while gRPC succeeds on the same credentials. The gRPC gateway and the REST API are separate
+components and become ready at different times, so this is usually a cluster that has not finished
+starting rather than one that cannot serve REST. Wait for the console to report the cluster healthy
+and retry, or set `transport: GRPC` to proceed in the meantime.
 
 ## Deploying resources
 

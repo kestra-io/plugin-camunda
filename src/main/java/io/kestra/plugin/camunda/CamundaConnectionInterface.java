@@ -107,6 +107,12 @@ public interface CamundaConnectionInterface {
         // else, asking for a transport whose address is missing would send the command to the client
         // default for that transport and fail as a connection error rather than a configuration one.
         var addressesDerived = rClusterId != null && rRestAddress == null && rGrpcAddress == null;
+        if (rTransport == Transport.REST && rClusterId != null && rRestAddress == null) {
+            // Only gRPC is usable from a bare SaaS config: the derived REST base is the pre-8.8 Zeebe
+            // gateway routing and 404s on a unified Orchestration Cluster. Camunda's own client docs
+            // say to take the REST address from the Console, so ask for it rather than 404 later.
+            throw new IllegalArgumentException("`transport: REST` on Camunda SaaS requires `restAddress`, the Orchestration Cluster REST Address from the Camunda Console, because the address derived from the cluster ID and region is not served");
+        }
         if (rTransport == Transport.REST && !addressesDerived && rRestAddress == null) {
             throw new IllegalArgumentException("`transport: REST` requires `restAddress`, only `grpcAddress` is set");
         }

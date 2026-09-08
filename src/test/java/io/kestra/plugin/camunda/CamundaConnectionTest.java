@@ -147,6 +147,21 @@ class CamundaConnectionTest {
     }
 
     @Test
+    void transportRestOnSaas_withoutRestAddress_namesTheConsole() {
+        // gRPC works from a bare SaaS config but REST does not, so asking for REST without an address
+        // must say where to get one instead of 404ing at command time
+        var task = builder()
+            .clusterId(Property.ofValue("cluster-id"))
+            .clientId(Property.ofValue("client"))
+            .clientSecret(Property.ofValue("secret"))
+            .transport(Property.ofValue(Transport.REST))
+            .build();
+
+        var exception = assertThrows(IllegalArgumentException.class, () -> task.run(runContextFactory.of()));
+        assertThat(exception.getMessage(), containsString("Camunda Console"));
+    }
+
+    @Test
     void noAddressAtAll_isRejectedRatherThanDefaultingToLoopback() {
         var task = builder().build();
 

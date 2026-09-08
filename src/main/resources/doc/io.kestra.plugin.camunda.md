@@ -54,8 +54,10 @@ region: "{{ secret('CAMUNDA_REGION') }}"
 clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
 clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
 restAddress: "{{ secret('CAMUNDA_REST_ADDRESS') }}"
-transport: REST
 ```
+
+Setting `restAddress` is enough, REST is inferred from it. Without it a SaaS client can only use
+gRPC, which is why that is the default there.
 
 Setting an address alongside `clusterId` builds the client directly rather than through the cloud
 builder, whose `build()` overwrites any address it is given, and keeps the SaaS OAuth endpoint and

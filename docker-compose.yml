@@ -10,3 +10,16 @@ services:
       - "8080:8080"
     volumes:
       - ./build/libs/:/app/plugins/
+
+  # Single-node Camunda 8 cluster without secondary storage: broker, gateway and REST API only.
+  # Enough for every task in this plugin, Operate and Tasklist are not included.
+  camunda:
+    image: camunda/camunda:8.9.19
+    environment:
+      SPRING_PROFILES_ACTIVE: broker
+      CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI: "true"
+      CAMUNDA_DATA_SECONDARYSTORAGE_TYPE: none
+    ports:
+      - "8081:8080"
+      - "26500:26500"
+      - "9600:9600"

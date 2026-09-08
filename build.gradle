@@ -30,7 +30,7 @@ java {
 }
 
 group = "io.kestra.plugin"
-description = 'Camunda plugin for Kestra'
+description = 'Interact with a Camunda 8 cluster from Kestra flows.'
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
@@ -50,8 +50,27 @@ dependencies {
     annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
     compileOnly group: "io.kestra", name: "script", version: kestraVersion
+
+    // official Camunda 8 client, used instead of Kestra's HTTP client because it owns the gRPC job worker protocol
+    implementation "io.camunda:camunda-client-java:$camundaVersion"
 }
 
+
+// The Kestra platform pins older versions than camunda-client-java 8.9 was compiled against:
+// httpclient5 5.5.1 has no HttpAsyncClientBuilder.disableContentCompression(), and protobuf-java 3.25.x
+// has no RuntimeVersion, which the generated gRPC gateway stubs reference. Force what the client needs.
+[
+    configurations.compileClasspath,
+    configurations.runtimeClasspath,
+    configurations.testCompileClasspath,
+    configurations.testRuntimeClasspath
+].each { cfg ->
+    cfg.resolutionStrategy.force "org.apache.httpcomponents.client5:httpclient5:5.6.4"
+    cfg.resolutionStrategy.force "org.apache.httpcomponents.core5:httpcore5:5.4.3"
+    cfg.resolutionStrategy.force "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3"
+    cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java:4.33.6"
+    cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java-util:4.33.6"
+}
 
 /**********************************************************************************************************************\
  * Test
@@ -88,6 +107,11 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
+    testImplementation "org.awaitility:awaitility"
+
+    // testcontainers
+    testImplementation "org.testcontainers:testcontainers:2.0.5"
+    testImplementation "org.testcontainers:junit-jupiter:1.21.4"
 }
 
 /**********************************************************************************************************************\

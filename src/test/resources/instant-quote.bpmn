@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  id="definitions_instant_quote"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="kestra-instant-quote" isExecutable="true">
+    <bpmn:startEvent id="start">
+      <bpmn:outgoing>to_end</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:endEvent id="end">
+      <bpmn:incoming>to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="to_end" sourceRef="start" targetRef="end" />
+  </bpmn:process>
+</bpmn:definitions>

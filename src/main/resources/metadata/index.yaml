@@ -1,8 +1,18 @@
 group: io.kestra.plugin.camunda
 name: "camunda"
 title: "Camunda"
-description: "Camunda plugin for Kestra"
-body: ""
+description: "Interact with a Camunda 8 cluster from Kestra flows."
+body: |
+  Camunda 8 is a process orchestrator built around BPMN. This plugin talks to a Camunda 8 cluster
+  with the official `camunda-client-java` client, so Kestra flows can drive Camunda process
+  instances and Camunda service tasks can be implemented as Kestra flows.
+
+  It covers deploying BPMN, DMN and form resources, starting and cancelling process instances,
+  publishing correlation messages, holding a job worker open as a realtime trigger, and completing
+  the activated job from the flow.
+
+  Authentication supports no credentials (development clusters), Basic auth, OAuth2 against a
+  self-managed identity provider, and Camunda SaaS client credentials.
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

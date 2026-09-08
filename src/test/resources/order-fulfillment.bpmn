@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="definitions_order_fulfillment"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="kestra-order-fulfillment" isExecutable="true">
+    <bpmn:startEvent id="start">
+      <bpmn:outgoing>to_notify</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="notify" name="Notify">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="kestra-notify" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>to_notify</bpmn:incoming>
+      <bpmn:outgoing>to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end">
+      <bpmn:incoming>to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="to_notify" sourceRef="start" targetRef="notify" />
+    <bpmn:sequenceFlow id="to_end" sourceRef="notify" targetRef="end" />
+  </bpmn:process>
+</bpmn:definitions>

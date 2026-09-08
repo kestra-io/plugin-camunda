@@ -1,0 +1,98 @@
+package io.kestra.plugin.camunda;
+
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.Task;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
+
+@SuperBuilder
+@ToString
+@EqualsAndHashCode
+@Getter
+@NoArgsConstructor
+public abstract class AbstractCamundaTask extends Task implements CamundaConnectionInterface {
+
+    @Schema(
+        title = "REST API base URL of the Camunda cluster",
+        description = "For a self-managed cluster, the orchestration cluster address, for example `http://localhost:8080`. Most commands use the REST API by default."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> restAddress;
+
+    @Schema(
+        title = "gRPC gateway address of the Camunda cluster",
+        description = "For a self-managed cluster, for example `http://localhost:26500`. Used by the job worker stream of the [Trigger](https://kestra.io/plugins/plugin-camunda/triggers/io.kestra.plugin.camunda.trigger)."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> grpcAddress;
+
+    @Schema(
+        title = "Username for Basic authentication",
+        description = "Must be set together with `password`. Mutually exclusive with the OAuth2 properties."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> username;
+
+    @Schema(
+        title = "Password for Basic authentication",
+        description = "Must be set together with `username`."
+    )
+    @ToString.Exclude
+    @PluginProperty(group = "connection", secret = true)
+    private Property<String> password;
+
+    @Schema(
+        title = "OAuth2 client ID",
+        description = "Set together with `clientSecret` and either `authorizationServerUrl` (self-managed) or `clusterId` (SaaS)."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> clientId;
+
+    @Schema(
+        title = "OAuth2 client secret",
+        description = "Set together with `clientId`."
+    )
+    @ToString.Exclude
+    @PluginProperty(group = "connection", secret = true)
+    private Property<String> clientSecret;
+
+    @Schema(
+        title = "OAuth2 token endpoint",
+        description = "Required for OAuth2 against a self-managed cluster, for example `http://localhost:18080/auth/realms/camunda-platform/protocol/openid-connect/token`."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> authorizationServerUrl;
+
+    @Schema(
+        title = "OAuth2 audience",
+        description = "Audience claim requested with the access token. Defaults to whatever the identity provider issues."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> audience;
+
+    @Schema(
+        title = "Camunda SaaS cluster ID",
+        description = "Switches the client to SaaS mode, where `restAddress` and `grpcAddress` are derived from the cluster ID and region."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> clusterId;
+
+    @Schema(
+        title = "Camunda SaaS region",
+        description = "For example `bru-2`. Only used with `clusterId`."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> region;
+
+    @Schema(
+        title = "Tenant ID",
+        description = "Applied to every command sent by this task. Only relevant on a cluster with multi-tenancy enabled."
+    )
+    @PluginProperty(group = "connection")
+    private Property<String> tenantId;
+}

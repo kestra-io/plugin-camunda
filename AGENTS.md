@@ -2,30 +2,37 @@
 
 ## What
 
-- Provides plugin components under `io.kestra.plugin.camunda`.
-- Includes classes such as `Example`, `Trigger`.
+- Provides plugin components under `io.kestra.plugin.camunda`, talking to a Camunda 8 cluster through the official `io.camunda:camunda-client-java` client.
+- Tasks: `Deploy`, `CreateProcessInstance`, `CancelProcessInstance`, `PublishMessage`, `CompleteJob`.
+- Trigger: `Trigger`, a realtime job-worker trigger emitting one execution per activated Camunda job.
 
 ## Why
 
-- What user problem does this solve? Teams need a concrete starting point for building and validating new Kestra plugins without recreating the same project scaffolding from scratch.
-- Why would a team adopt this plugin in a workflow? It gives plugin authors a ready-made reference repo they can adapt alongside their own build, test, and publishing workflow.
-- What operational/business outcome does it enable? It shortens plugin delivery time, reduces setup mistakes, and makes internal or partner plugin development more repeatable.
+- Teams with an existing Camunda 8 footprint had no way to drive Camunda process instances from a Kestra flow, or to trigger Kestra flows from Camunda jobs, without hand-rolled gRPC or REST client code.
+- Lets Kestra sit next to an existing Camunda deployment instead of replacing it, which is the coexistence half of the story (the migration half is a separate skill).
+- Operationally, a BPMN service task can be implemented as a Kestra flow, and a Kestra flow can start, await and cancel Camunda process instances.
 
 ## How
 
 ### Architecture
 
-Single-module plugin. Source packages under `io.kestra.plugin`:
+Single-module plugin, flat package `io.kestra.plugin.camunda`. No sub-plugins.
 
-- `camunda`
+- `CamundaConnectionInterface` declares the connection and authentication properties. `AbstractCamundaTask` holds them for tasks, `Trigger` declares them itself because it extends `AbstractTrigger`.
+- `CamundaClientFactory` turns those properties into a `CamundaClient` and validates the authentication mode. Environment variable overrides are disabled so a flow only connects with what it declares.
+- `Job` is the trigger output, built from `ActivatedJob`.
+- The trigger opens a job worker inside `Flux.create` and blocks the subscribing thread on a latch. `stop()` counts the latch down (non-blocking), `kill()` also waits for the worker to close.
 
 Infrastructure dependencies (Docker Compose services):
 
-- `app`
+- `app`: local Kestra server with the built plugin mounted.
+- `camunda`: single-node Camunda 8 cluster, no secondary storage, REST on 8081 and gRPC on 26500.
 
-### Key Plugin Classes
+### Dependency pinning
 
-- `io.kestra.plugin.camunda.Example`
+The Kestra platform BOM pins older `httpclient5` and `protobuf-java` than `camunda-client-java` 8.9 was
+compiled against, which fails at runtime with `NoSuchMethodError` and `NoClassDefFoundError`. `build.gradle`
+forces the versions the client needs. Revisit those forces whenever `camundaVersion` or `kestraVersion` moves.
 
 ### Project Structure
 
@@ -33,6 +40,7 @@ Infrastructure dependencies (Docker Compose services):
 plugin-camunda/
 ├── src/main/java/io/kestra/plugin/camunda/
 ├── src/test/java/io/kestra/plugin/camunda/
+├── src/test/resources/*.bpmn, *.dmn
 ├── build.gradle
 └── README.md
 ```
@@ -40,8 +48,11 @@ plugin-camunda/
 ## Local rules
 
 - Base the wording on the implemented packages and classes, not on template README text.
+- Tests boot a real Camunda cluster with Testcontainers, so `./gradlew test` needs Docker. Keep the cluster a single shared instance (`CamundaTestCluster`), booting one per test class is slow.
 
 ## References
 
 - https://kestra.io/docs/plugin-developer-guide
 - https://kestra.io/docs/plugin-developer-guide/contribution-guidelines
+- https://docs.camunda.io/docs/apis-tools/java-client/getting-started/
+- https://docs.camunda.io/docs/apis-tools/camunda-api-rest/camunda-api-rest-overview/

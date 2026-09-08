@@ -37,16 +37,36 @@
 
 # Kestra Camunda Plugin
 
+Interact with a Camunda 8 cluster from Kestra flows, using the official `io.camunda:camunda-client-java` client.
+
 ## Why
 
-- What user problem does this solve? Teams need a concrete starting point for building and validating new Kestra plugins without recreating the same project scaffolding from scratch.
-- Why would a team adopt this plugin in a workflow? It gives plugin authors a ready-made reference repo they can adapt alongside their own build, test, and publishing workflow.
-- What operational/business outcome does it enable? It shortens plugin delivery time, reduces setup mistakes, and makes internal or partner plugin development more repeatable.
+Teams with an existing Camunda 8 footprint had no way to drive Camunda process instances from a Kestra
+flow, or to implement a Camunda service task as a Kestra flow, without hand-rolled gRPC or REST client
+code. This plugin covers both directions, so Kestra can run next to Camunda instead of replacing it.
 
 ## What
 
-- Provides plugin components under `io.kestra.plugin.camunda`.
-- Includes classes such as `Example`, `Trigger`.
+Tasks and triggers under `io.kestra.plugin.camunda`:
+
+- `Deploy`: deploy BPMN, DMN and form resources in one atomic command.
+- `CreateProcessInstance`: start a process instance, optionally awaiting its result.
+- `CancelProcessInstance`: terminate a running process instance.
+- `PublishMessage`: publish a correlation message.
+- `CompleteJob`: report an activated job as done, with output variables.
+- `FailJob`: report an activated job as failed, raising a Camunda incident.
+- `Trigger`: hold a job worker open and start one execution per activated job.
+
+Authentication covers no credentials (development clusters), Basic auth, OAuth2 against a self-managed
+identity provider, and Camunda SaaS client credentials.
+
+## Local development
+
+`docker-compose.yml` starts a single-node Camunda 8 cluster without secondary storage on
+`http://localhost:8080` (REST) and `localhost:26500` (gRPC), which is enough for every task here.
+Kestra's own dev server in that file is on `http://localhost:8090` so that Camunda keeps port 8080.
+
+Tests use Testcontainers with the same image, so `./gradlew test` needs Docker.
 
 ## Documentation
 * Full documentation can be found under: [kestra.io/docs](https://kestra.io/docs)

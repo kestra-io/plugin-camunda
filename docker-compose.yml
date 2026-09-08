@@ -1,12 +1,29 @@
 version: "3.8"
 
 services:
+  # Kestra sits on 8090 so that Camunda keeps its own default port, 8080, which is what every
+  # example in this plugin uses.
   app:
     build:
       context: .
       dockerfile: Dockerfile
     command: server local
     ports:
-      - "8080:8080"
+      - "8090:8080"
     volumes:
       - ./build/libs/:/app/plugins/
+
+  # Single-node Camunda 8 cluster without secondary storage: broker, gateway and REST API only.
+  # Enough for every task in this plugin, Operate and Tasklist are not included.
+  camunda:
+    image: camunda/camunda:8.9.19
+    environment:
+      SPRING_PROFILES_ACTIVE: broker
+      CAMUNDA_SECURITY_AUTHENTICATION_UNPROTECTEDAPI: "true"
+      # unprotecting the API covers REST only, the gRPC gateway runs authorization checks of its own
+      CAMUNDA_SECURITY_AUTHORIZATIONS_ENABLED: "false"
+      CAMUNDA_DATA_SECONDARYSTORAGE_TYPE: none
+    ports:
+      - "8080:8080"
+      - "26500:26500"
+      - "9600:9600"

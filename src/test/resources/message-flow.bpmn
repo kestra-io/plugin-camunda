@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Two service tasks behind a message catch event. The second job proves two things the single-task
+  fixture cannot: that a published message actually correlated, and that CompleteJob's output
+  variables reached the process instance.
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  id="definitions_message_flow"
+                  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:message id="msg_payment_received" name="kestra-payment-received">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="=orderId" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:process id="kestra-message-flow" isExecutable="true">
+    <bpmn:startEvent id="start">
+      <bpmn:outgoing>to_await</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:intermediateCatchEvent id="await_payment">
+      <bpmn:incoming>to_await</bpmn:incoming>
+      <bpmn:outgoing>to_first</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="msg_def" messageRef="msg_payment_received" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="first" name="First">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="kestra-first" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>to_first</bpmn:incoming>
+      <bpmn:outgoing>to_second</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="second" name="Second">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="kestra-second" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>to_second</bpmn:incoming>
+      <bpmn:outgoing>to_end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end">
+      <bpmn:incoming>to_end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="to_await" sourceRef="start" targetRef="await_payment" />
+    <bpmn:sequenceFlow id="to_first" sourceRef="await_payment" targetRef="first" />
+    <bpmn:sequenceFlow id="to_second" sourceRef="first" targetRef="second" />
+    <bpmn:sequenceFlow id="to_end" sourceRef="second" targetRef="end" />
+  </bpmn:process>
+</bpmn:definitions>

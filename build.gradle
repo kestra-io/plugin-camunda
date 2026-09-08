@@ -186,6 +186,15 @@ jar {
 
 shadowJar {
     archiveClassifier.set(null)
+
+    // shadowJar resolves to DuplicatesStrategy.EXCLUDE here (the plain `jar` task is INCLUDE), which
+    // makes Gradle drop a duplicate entry before any transformer runs, so mergeServiceFiles() below
+    // silently does nothing. grpc-core and grpc-netty both ship
+    // META-INF/services/io.grpc.NameResolverProvider; only grpc-netty's survived, leaving its
+    // unix-socket resolver as the sole provider and therefore gRPC's default scheme. Every gRPC
+    // target then failed with "Address types of NameResolver 'unix' for '...' not supported by
+    // transport", and grpc-core's PickFirstLoadBalancerProvider went missing the same way.
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
 }
 

@@ -18,8 +18,8 @@
 
 Single-module plugin, flat package `io.kestra.plugin.camunda`. No sub-plugins.
 
-- `CamundaConnectionInterface` declares the connection and authentication properties. `AbstractCamundaTask` holds them for tasks, `Trigger` declares them itself because it extends `AbstractTrigger`.
-- `CamundaClientFactory` turns those properties into a `CamundaClient` and validates the authentication mode. Environment variable overrides are disabled so a flow only connects with what it declares.
+- `CamundaConnectionInterface` owns the whole connection concern: the property getters plus `camundaClient()`, which renders them, validates the authentication mode and builds the client. Environment variable overrides are disabled so a flow only connects with what it declares.
+- The interface exists because tasks extend `Task` and the trigger extends `AbstractTrigger`, so there is no shared base class. `AbstractCamundaTask` declares the fields for tasks, `Trigger` declares them itself. That duplication is the price of the class hierarchy, do not add a third layer to hide it.
 - `Job` is the trigger output, built from `ActivatedJob`.
 - The trigger opens a job worker inside `Flux.create` and blocks the subscribing thread on a latch. `stop()` counts the latch down (non-blocking), `kill()` also waits for the worker to close.
 

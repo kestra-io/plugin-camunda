@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Authentication configuration is rejected before any connection is opened, so these run without a cluster.
  */
 @KestraTest
-class CamundaClientFactoryTest {
+class CamundaConnectionTest {
 
     @Inject
     RunContextFactory runContextFactory;

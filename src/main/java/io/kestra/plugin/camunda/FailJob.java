@@ -55,7 +55,6 @@ import java.util.Map;
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
                     audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
-                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     jobType: charge-payment
                     timeout: PT5M
 
@@ -71,7 +70,6 @@ import java.util.Map;
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
                     audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
-                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     jobKey: "{{ trigger.jobKey }}"
 
                 errors:
@@ -81,7 +79,6 @@ import java.util.Map;
                     clientId: "{{ secret('CAMUNDA_CLIENT_ID') }}"
                     clientSecret: "{{ secret('CAMUNDA_CLIENT_SECRET') }}"
                     authorizationServerUrl: "{{ secret('CAMUNDA_AUTH_SERVER_URL') }}"
-                    audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     audience: "{{ secret('CAMUNDA_AUDIENCE') }}"
                     jobKey: "{{ trigger.jobKey }}"
                     errorMessage: "Kestra execution {{ execution.id }} failed"

@@ -67,8 +67,8 @@ dependencies {
     cfg.resolutionStrategy.force "org.apache.httpcomponents.client5:httpclient5:5.6.4"
     cfg.resolutionStrategy.force "org.apache.httpcomponents.core5:httpcore5:5.4.3"
     cfg.resolutionStrategy.force "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3"
-    cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java:4.33.6"
-    cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java-util:4.33.6"
+    cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java:4.36.1"
+    cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java-util:4.36.1"
 }
 
 /**********************************************************************************************************************\

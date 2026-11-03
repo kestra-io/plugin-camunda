@@ -71,6 +71,18 @@ dependencies {
     cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java-util:4.36.2"
 }
 
+// Security pin: the Kestra platform BOM (1.3.x) ships Jackson 2.21.1, below the fixed 2.21.7.
+// Remove this block once the platform bumps Jackson to 2.21.7 or later.
+[
+    configurations.compileClasspath,
+    configurations.runtimeClasspath,
+    configurations.testCompileClasspath,
+    configurations.testRuntimeClasspath
+].each { cfg ->
+    cfg.resolutionStrategy.force "com.fasterxml.jackson.core:jackson-databind:2.21.7"
+    cfg.resolutionStrategy.force "com.fasterxml.jackson.core:jackson-core:2.21.7"
+}
+
 /**********************************************************************************************************************\
  * Test
  **********************************************************************************************************************/

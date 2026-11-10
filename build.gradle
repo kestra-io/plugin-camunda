@@ -70,7 +70,7 @@ dependencies {
     cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java:4.36.2"
     cfg.resolutionStrategy.force "com.google.protobuf:protobuf-java-util:4.36.2"
     // SEC-0369: platform BOM pins guava 33.4.8-jre, remove once it ships >= 33.7.2.
-    cfg.resolutionStrategy.force "com.google.guava:guava:33.7.2-jre"
+    cfg.resolutionStrategy.force "com.google.guava:guava:33.8.0-jre"
 }
 
 // Security pin: the Kestra platform BOM (1.3.x) ships Jackson 2.21.1, below the fixed 2.21.7.
